@@ -5,23 +5,32 @@ const Jimp = require('jimp');
 const cors = require('cors');
 
 const app = express();
+
+// Middleware
 app.use(cors());
 app.use(express.json());
 
+// Configure multer for memory storage
 const upload = multer({ storage: multer.memoryStorage() });
 
+// QR Code scan endpoint
 app.post('/api/scan-qr', upload.single('qrImage'), async (req, res) => {
     try {
+        console.log('Request received:', req.file ? 'File present' : 'No file');
+        
         if (!req.file) {
             return res.status(400).json({
                 success: false,
-                message: 'কোনো ছবি আপলোড করা হয়নি'
+                message: 'No image file uploaded'
             });
         }
 
+        // Read image from buffer
         const image = await Jimp.read(req.file.buffer);
         const { data, width, height } = image.bitmap;
         const imageData = new Uint8ClampedArray(data);
+        
+        // Decode QR code
         const code = decode(imageData, width, height);
 
         if (code && code.data) {
@@ -33,10 +42,11 @@ app.post('/api/scan-qr', upload.single('qrImage'), async (req, res) => {
         } else {
             res.json({
                 success: false,
-                message: 'QR কোড খুঁজে পাওয়া যায়নি'
+                message: 'No QR code found in the image'
             });
         }
     } catch (error) {
+        console.error('Error:', error);
         res.status(500).json({
             success: false,
             message: error.message
@@ -44,31 +54,26 @@ app.post('/api/scan-qr', upload.single('qrImage'), async (req, res) => {
     }
 });
 
+// Health check endpoint
 app.get('/api/health', (req, res) => {
-    res.json({ status: 'OK' });
+    res.json({ 
+        status: 'OK', 
+        message: 'QR Scanner API is running',
+        timestamp: new Date().toISOString()
+    });
 });
 
-module.exports = app;                data: code.data,
-                format: 'QR_CODE',
-                timestamp: new Date().toISOString()
-            });
-        } else {
-            res.json({
-                success: false,
-                message: 'এই ছবিতে কোনো QR কোড খুঁজে পাওয়া যায়নি'
-            });
+// Root endpoint
+app.get('/', (req, res) => {
+    res.json({
+        name: 'QR Code Scanner API',
+        version: '1.0.0',
+        endpoints: {
+            scan: '/api/scan-qr (POST)',
+            health: '/api/health (GET)'
         }
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
+    });
 });
 
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'OK', timestamp: new Date().toISOString() });
-});
-
-// Vercel-এর জন্য export করতে হবে
+// Export for Vercel
 module.exports = app;
