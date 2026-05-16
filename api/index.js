@@ -11,12 +11,15 @@ app.use(cors());
 app.use(express.json());
 
 // Configure multer for memory storage
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
 
 // QR Code scan endpoint
 app.post('/api/scan-qr', upload.single('qrImage'), async (req, res) => {
     try {
-        console.log('Request received:', req.file ? 'File present' : 'No file');
+        console.log('API called - scan-qr');
         
         if (!req.file) {
             return res.status(400).json({
@@ -46,10 +49,10 @@ app.post('/api/scan-qr', upload.single('qrImage'), async (req, res) => {
             });
         }
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Scan error:', error);
         res.status(500).json({
             success: false,
-            message: error.message
+            message: error.message || 'Internal server error'
         });
     }
 });
@@ -68,10 +71,26 @@ app.get('/', (req, res) => {
     res.json({
         name: 'QR Code Scanner API',
         version: '1.0.0',
+        status: 'active',
         endpoints: {
-            scan: '/api/scan-qr (POST)',
-            health: '/api/health (GET)'
+            scan: {
+                method: 'POST',
+                url: '/api/scan-qr',
+                body: 'multipart/form-data with "qrImage" field'
+            },
+            health: {
+                method: 'GET',
+                url: '/api/health'
+            }
         }
+    });
+});
+
+// Handle 404
+app.use('*', (req, res) => {
+    res.status(404).json({
+        success: false,
+        message: `Route ${req.method} ${req.path} not found`
     });
 });
 
